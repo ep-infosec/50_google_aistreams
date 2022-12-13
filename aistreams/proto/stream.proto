@@ -1,0 +1,161 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package aistreams;
+
+import "aistreams/proto/packet.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// Configuration used by consumers to reset its offset.
+message OffsetConfig {
+  // SpecialOffset is a set of predefined special offset configuration.
+  enum SpecialOffset {
+    OFFSET_BEGINNING = 0;
+    OFFSET_END = 1;
+  }
+
+  oneof config {
+    // The start consuming from the earliest or latest position.
+    SpecialOffset special_offset = 1;
+
+    // The offset position that the consumer wants to set to. The consumer can
+    // specify a position in the stream and start consuming from there. If the
+    // packet for the `seek_position` is not a critical frame, the consumer will
+    // receive the latest critical packet prior to the that in the
+    // `seek_position`.
+    int64 seek_position = 2;
+
+    // The consumer will start consuming from the latest packet that is earlier
+    // than the `seek_time`. If the packet for the `seek_time` is not a critical
+    // frame, the consumer will receive the latest critical packet prior to the
+    // `seek_time`.
+    google.protobuf.Timestamp seek_time = 3;
+  }
+}
+
+// Response message for SendPackets.
+message SendPacketsResponse {}
+
+// Response message for SendOnePacket.
+message SendOnePacketResponse {
+  // The sent packet was accepted into the stream.
+  // This can be false when the stream is full.
+  bool accepted = 1;
+}
+
+// Request message for ReceivePackets.
+message ReceivePacketsRequest {
+  // To start receiving packets, client has to provide a unique consumer name.
+  // If the consumer name was duplicated, the
+  // stream server will reject the request.
+  string consumer_name = 1;
+
+  // The configuration for the consumer to reset its offset. If this field is
+  // not set, the existing consumers will resume its consumption from where it
+  // stopped previously; otherwise a new consumer it will consume from the
+  // latest packet in the stream.
+  OffsetConfig offset_config = 2;
+
+  // If this value is specified, the stream server will stop the streaming gRPC
+  // connection if no new packet is available for a duration longer than the
+  // `timeout` here. Otherwise, the stream server will block until a packet is
+  // available.
+  google.protobuf.Duration timeout = 3;
+}
+
+// Request message for ReceiveOnePacket.
+message ReceiveOnePacketRequest {
+  // To start receiving packets, client has to provide a unique consumer name.
+  // If the server has never seen this consumer name, it will add this consumer
+  // name and start recording its offset.
+  string consumer_name = 1;
+
+  // If true, then this request will block until a new element is available to
+  // the consumer. Otherwise return UNAVAILABLE status immediately if there's no
+  // available new element.
+  //
+  // By default blocking is false.
+  bool blocking = 2;
+
+  // The configuration for the consumer to reset its offset. If this field is
+  // not set, the existing consumers will resume its consumption from where it
+  // stopped previously; otherwise a new consumer it will consume from the
+  // latest packet in the stream.
+  OffsetConfig offset_config = 3;
+}
+
+// Response message for ReceiveOnePacket.
+message ReceiveOnePacketResponse {
+  // Set to true when the enclosed packet is valid for use.
+  // This can be false, for example, when the stream is empty.
+  bool valid = 1;
+
+  // The packet returned from the server.
+  // Accessing this field when valid is false is undefined behavior.
+  Packet packet = 2;
+}
+
+// Request message for ReplayStreamRequest.
+message ReplayStreamRequest {
+  // The seek options that client can specify to seek the stream.
+  // TODO: deprecate this field.
+  oneof seek_option {
+    // The timestamp that the client wants to start to consume. The consumer
+    // specifies the start timestamp and will get the stream of packets from the
+    // stream server.
+    google.protobuf.Timestamp seek_time = 4;
+
+    // The offset that the client wants to start to consume.
+    int64 seek_offset = 5;
+  }
+
+  // To start receiving packets, client has to provide a unique consumer name.
+  // If the consumer name was duplicated, the stream server will reject the
+  // request.
+  string consumer_name = 1;
+
+  // The configuration for the consumer to reset its offset. If this field is
+  // not set, the existing consumers will resume its consumption from where it
+  // stopped previously; otherwise a new consumer it will consume from the
+  // latest packet in the stream.
+  OffsetConfig offset_config = 2;
+
+  // If this value is specified, the stream server will stop the streaming gRPC
+  // connection if no new packet is available for a duration longer than the
+  // `timeout` here. Otherwise, the stream server will block until a packet is
+  // available.
+  google.protobuf.Duration timeout = 3;
+}
+
+// This is the server that accepts stream packets.
+service StreamServer {
+  // Send packets to an existing stream.
+  rpc SendPackets(stream Packet) returns (SendPacketsResponse) {}
+
+  // Send one packet to an existing stream.
+  rpc SendOnePacket(Packet) returns (SendOnePacketResponse) {}
+
+  // Receive packets from an existing stream.
+  rpc ReceivePackets(ReceivePacketsRequest) returns (stream Packet) {}
+
+  // Receive one packet from an existing stream.
+  rpc ReceiveOnePacket(ReceiveOnePacketRequest)
+      returns (ReceiveOnePacketResponse) {}
+
+  // Replay packets in the stream.
+  rpc ReplayStream(ReplayStreamRequest) returns (stream Packet) {}
+}

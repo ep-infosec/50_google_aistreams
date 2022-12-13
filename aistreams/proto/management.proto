@@ -1,0 +1,136 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+
+package aistreams;
+
+// This is the stream management server.
+service ManagementServer {
+  // Create a stream to which packets may be sent.
+  rpc CreateStream(CreateStreamRequest) returns (CreateStreamResponse) {}
+  // Delete a stream.
+  rpc DeleteStream(DeleteStreamRequest) returns (google.protobuf.Empty) {}
+  // List streams.
+  rpc ListStream(ListStreamRequest) returns (ListStreamResponse) {}
+}
+
+// Cluster message is the representation of the cluster resource.
+message Cluster {
+  // The name of the cluster.
+  string name = 1;
+  // The endpoint of the streaming service.
+  string service_endpoint = 2;
+  // The certificate for building secure connection to service.
+  string certificate = 3;
+}
+
+// Stream message is the representation of the stream resource.
+message Stream {
+  // The name of the stream.
+  string name = 1;
+
+  // The retention period for the stream.
+  google.protobuf.Duration retention_period = 2;
+}
+
+// Configuration for stream manager to manage on-prem streams.
+message StreamManagerOnPremConfig {
+  // This is the ip:port to an AI Streams service.
+  string target_address = 1;
+
+  // TODO: create a new message for SslOptions.
+  // Options to configure TLS/SSL over the communication channel.
+  // Use an insecure channel to connect to the server.
+  //
+  // If false, then you have to review and the fields below as appropriate.
+  bool use_insecure_channel = 2;
+  // The expected ssl domain name of the server.
+  string ssl_domain_name = 3;
+  // This file path to the root CA certificate.
+  string ssl_root_cert_path = 4;
+
+  // TODO: create a new message for RpcOptions.
+  // Options to configure RPCs made over this connection.
+  // The timeout for a call. Set a positive value to timeout. By default its
+  // value is -1, and won't be used for RPC calls
+  google.protobuf.Duration timeout = 5;
+  // If true, then block until the underlying communication channel
+  // becomes ready instead of failing fast.
+  bool wait_for_ready = 6;
+};
+
+// Configuration for stream manager to manage Google managed streams.
+message StreamManagerManagedConfig {
+  // This is the API endpoint for AI Streams service.
+  string target_address = 1;
+  // The project hosting the management server.
+  string project = 2;
+  // The location of the management server.
+  string location = 3;
+  // The cluster hosting the management server.
+  string cluster = 4;
+};
+
+// Stream manager configuration.
+message StreamManagerConfig {
+  oneof config {
+    // Configuration for building stream manager to manage on-prem streams.
+    StreamManagerOnPremConfig stream_manager_onprem_config = 1;
+    // Configuration for building stream manager to manage managed streams.
+    StreamManagerManagedConfig stream_manager_managed_config = 2;
+  }
+};
+
+// Cluster manager configuration.
+message ClusterManagerConfig {
+  // This is the API endpoint for AI Streams service.
+  string target_address = 1;
+  // The project hosting the management server.
+  string project = 2;
+  // The location of the management server.
+  string location = 3;
+};
+
+// Request message for CreateStream.
+message CreateStreamRequest {
+  // The stream name you want to be created.
+  string stream_name = 1;
+
+  // The retention period for the stream.
+  google.protobuf.Duration retention_period = 2;
+}
+
+// Response message from CreateStream.
+message CreateStreamResponse {
+  // The name of the created stream.
+  string stream_name = 1;
+}
+
+// Request message for DeleteStream.
+message DeleteStreamRequest {
+  string stream_name = 1;
+}
+
+// Request message for ListStream.
+message ListStreamRequest {}
+
+// Response message from ListStream.
+message ListStreamResponse {
+  repeated string stream_names = 1;
+}
